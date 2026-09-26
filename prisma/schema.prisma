@@ -1,0 +1,177 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id           String   @id @default(cuid())
+  email        String   @unique
+  name         String
+  password     String
+  role         String   // CENTRAL_MINISTRY, STATE_OFFICER, DISTRICT_COLLECTOR, REQUIRING_BODY, FIELD_OFFICER, LANDOWNER, ADMIN
+  status       String   @default("ACTIVE") // ACTIVE, PENDING, DISABLED
+  department   String?
+  phone        String?
+  jurisdiction String?
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+}
+
+model Project {
+  id               String   @id @default(cuid())
+  code             String   @unique
+  name             String
+  nameHi           String?
+  sector           String   // HIGHWAY, RAILWAY, IRRIGATION, INDUSTRIAL, TRANSMISSION
+  state            String
+  district         String
+  tehsils          String
+  status           String   // PROPOSAL, SCRUTINY, SIA, SEC_11, OBJECTIONS, SEC_19, AWARD, COMPENSATION, POSSESSION, COMPLETED
+  stage            String
+  slaDeadline      DateTime
+  delayRiskScore   Int      @default(10)
+  delayReasons     String?  // JSON string array
+  budgetCr         Float
+  disbursedCr      Float    @default(0)
+  targetAreaHa     Float
+  acquiredAreaHa   Float    @default(0)
+  totalParcels     Int      @default(0)
+  affectedFamilies Int      @default(0)
+  requiringBody    String
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+}
+
+model Village {
+  id          String   @id @default(cuid())
+  name        String
+  nameHi      String
+  tehsil      String
+  district    String
+  state       String
+  lat         Float
+  lng         Float
+  parcelCount Int      @default(0)
+}
+
+model Owner {
+  id                 String   @id @default(cuid())
+  name               String
+  nameHi             String?
+  maskedPhone        String
+  maskedAadhaar      String
+  address            String
+  bankAccountMasked  String?
+  ifsc               String?
+  isVulnerable       Boolean  @default(false)
+  vulnerabilityType  String?  // SC, ST, WOMEN_HEADED, MARGINAL_FARMER
+  familyMembers      Int      @default(4)
+  rrPackageAssigned  Boolean  @default(false)
+  rrEntitlementsJson String?
+  createdAt          DateTime @default(now())
+}
+
+model Parcel {
+  id                    String   @id @default(cuid())
+  ulpin                 String   @unique
+  surveyNo              String
+  subDivision           String?
+  villageId             String
+  villageName           String
+  district              String
+  areaHa                Float
+  landUse               String   // AGRICULTURAL_IRRIGATED, AGRICULTURAL_UNIRRIGATED, COMMERCIAL, RESIDENTIAL, BARREN
+  status                String   // PROPOSED, NOTIFIED, OBJECTIONS, AWARDED, COMPENSATION_PAID, POSSESSED, DISPUTED
+  geometry              String   // GeoJSON polygon coordinates string
+  centerLat             Float
+  centerLng             Float
+  ownerId               String?
+  ownerName             String?
+  projectId             String?
+  marketValuePerHa      Float
+  calculatedCompensation Float
+  paidCompensation      Float    @default(0)
+  isLitigation          Boolean  @default(false)
+  isEcoSensitive        Boolean  @default(false)
+  isMultiProjectOverlap Boolean  @default(false)
+  overlappingProjects   String?
+  createdAt             DateTime @default(now())
+}
+
+model CandidateAlignment {
+  id                     String   @id @default(cuid())
+  projectId              String
+  name                   String
+  description            String
+  bufferWidthMeters      Float
+  lineGeometry           String   // GeoJSON LineString
+  affectedParcelsCount   Int
+  affectedAreaHa         Float
+  estimatedCostCr        Float
+  displacedFamiliesCount Int
+  forestWaterOverlapHa   Float
+  isRecommended          Boolean  @default(false)
+  recommendationScore    Float
+  recommendationReasons  String
+}
+
+model Grievance {
+  id               String    @id @default(cuid())
+  trackingNo       String    @unique
+  parcelUlpin      String?
+  surveyNo         String?
+  applicantName    String
+  applicantPhone   String
+  category         String    // COMPENSATION_AMOUNT, OWNERSHIP_DISPUTE, MEASUREMENT_ERROR, RR_BENEFIT, OTHER
+  description      String
+  status           String    @default("PENDING") // PENDING, UNDER_REVIEW, HEARING_SCHEDULED, RESOLVED, REJECTED
+  hearingDate      DateTime?
+  resolutionNotes  String?
+  filedAt          DateTime  @default(now())
+  resolvedAt       DateTime?
+}
+
+model AuditLog {
+  id          String   @id @default(cuid())
+  timestamp   DateTime @default(now())
+  actorEmail  String
+  actorRole   String
+  action      String
+  entityType  String
+  entityId    String
+  details     String
+  ipAddress   String?
+  prevHash    String
+  hash        String
+}
+
+model AppNotification {
+  id             String   @id @default(cuid())
+  recipientEmail String
+  recipientRole  String?
+  title          String
+  titleHi        String?
+  message        String
+  messageHi      String?
+  type           String   @default("GENERAL") // SLA_WARNING, STAGE_CHANGE, GRIEVANCE, PAYMENT, GENERAL
+  isRead         Boolean  @default(false)
+  channel        String   @default("IN_APP")
+  createdAt      DateTime @default(now())
+}
+
+model SystemConfig {
+  id                      String   @id @default("default")
+  simulatedDateOffsetDays Int      @default(0)
+  slaProposalScrutinyDays Int      @default(15)
+  slaSiaAppraisalDays     Int      @default(60)
+  slaObjectionHearingDays Int      @default(60)
+  slaAwardEnquiryDays     Int      @default(90)
+  solatiumPercentage      Float    @default(100.0)
+  ruralMultiplier         Float    @default(1.5)
+  additionalInterestRate  Float    @default(12.0)
+  updatedAt               DateTime @updatedAt
+}

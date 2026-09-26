@@ -1,0 +1,34 @@
+version: '3.8'
+
+services:
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: lams_app
+    restart: always
+    ports:
+      - "3000:3000"
+    environment:
+      - DATABASE_URL=postgresql://lams_admin:lams_secure_pass_2026@postgres:5432/lams_db?schema=public
+      - NEXTAUTH_SECRET=lams-super-secure-production-ready-jwt-secret-2026
+      - NEXTAUTH_URL=http://localhost:3000
+      - NODE_ENV=production
+    depends_on:
+      - postgres
+
+  postgres:
+    image: postgres:16-alpine
+    container_name: lams_postgres
+    restart: always
+    environment:
+      POSTGRES_USER: lams_admin
+      POSTGRES_PASSWORD: lams_secure_pass_2026
+      POSTGRES_DB: lams_db
+    ports:
+      - "5432:5432"
+    volumes:
+      - lams_pgdata:/var/lib/postgresql/data
+
+volumes:
+  lams_pgdata:
