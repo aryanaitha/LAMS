@@ -1,11 +1,9 @@
-import { PrismaClient } from "@prisma/client";
-import { readLamsFullDataset } from "@/lib/datasetReader";
-import bcrypt from "bcryptjs";
-import path from "path";
+const { PrismaClient } = require('@prisma/client');
+const { readLamsFullDataset } = require('../src/lib/datasetReader.cjs');
+const bcrypt = require('../node_modules/.pnpm/bcryptjs@2.4.3/node_modules/bcryptjs');
+const path = require('path');
 
 const prisma = new PrismaClient();
-
-// "Today" for SLA and statutory timelines is 2026-09-01 per specification
 const ANCHOR_TODAY = new Date("2026-09-01T00:00:00.000Z");
 
 async function main() {
@@ -14,7 +12,6 @@ async function main() {
   const csvPath = path.resolve(process.cwd(), "lams_full_dataset.csv");
   console.log(`Loading dataset from: ${csvPath}`);
 
-  // Load and demultiplex dataset with bcrypt hashed passwords
   const dataset = readLamsFullDataset(csvPath, (plaintext) => {
     return bcrypt.hashSync(plaintext, 10);
   });
@@ -34,7 +31,7 @@ async function main() {
     - ${dataset.users.length} users
   `);
 
-  // 1. System Config (Ensure default exists)
+  // 1. System Config
   await prisma.systemConfig.upsert({
     where: { id: "default" },
     update: {
@@ -60,7 +57,7 @@ async function main() {
     },
   });
 
-  // 2. Villages (Upsert by village_id)
+  // 2. Villages
   console.log("Upserting villages...");
   for (const v of dataset.villages) {
     await prisma.village.upsert({
@@ -85,7 +82,7 @@ async function main() {
     });
   }
 
-  // 3. Owners (Upsert by owner_id)
+  // 3. Owners
   console.log("Upserting owners...");
   for (const o of dataset.owners) {
     await prisma.owner.upsert({
@@ -106,14 +103,12 @@ async function main() {
     });
   }
 
-  // 4. Projects (Upsert by project_id)
-  // Per specification: treat 2026-09-01 as "today" for SLA/delay logic:
-  // PRJ-003 and PRJ-005 are delayed (isDelayed=true); PRJ-002 breaches in 3 days; others healthy future deadline.
+  // 4. Projects
   console.log("Upserting projects...");
   for (const p of dataset.projects) {
     const slaDeadline = new Date(p.current_stage_sla_deadline + "T00:00:00.000Z");
     const startDate = p.start_date ? new Date(p.start_date + "T00:00:00.000Z") : ANCHOR_TODAY;
-    const isDelayed = p.is_delayed; // Preserved exactly from authoritative projects dataset
+    const isDelayed = p.is_delayed;
 
     await prisma.project.upsert({
       where: { code: p.project_id },
@@ -148,8 +143,9 @@ async function main() {
     });
   }
 
-  // 5. Litigation Cases map for Parcel enrichment
+  // 5. Litigation Cases map
   const litMap = new Map();
+  console.log("Upserting litigation cases...");
   for (const lit of dataset.litigation_cases) {
     litMap.set(lit.parcel_id, lit);
     await prisma.litigationCase.upsert({
@@ -175,6 +171,7 @@ async function main() {
 
   // 6. Parcel Project Overlaps map
   const overlapMap = new Map();
+  console.log("Upserting parcel project overlaps...");
   for (const ovl of dataset.parcel_project_overlaps) {
     overlapMap.set(ovl.parcel_id, ovl);
     await prisma.parcelProjectOverlap.upsert({
@@ -195,7 +192,7 @@ async function main() {
     });
   }
 
-  // 7. Parcels (Upsert by parcel_id & ulpin)
+  // 7. Parcels
   console.log("Upserting parcels...");
   for (const pcl of dataset.parcels) {
     const isLitigation = litMap.has(pcl.parcel_id);
@@ -225,13 +222,13 @@ async function main() {
         projectId: pcl.project_id,
         projectName: pcl.project_name,
         isLitigation,
-        litigationCaseNumber: lit?.case_number,
-        litigationCaseType: lit?.case_type,
-        litigationCourt: lit?.court,
-        litigationStatus: lit?.status,
+        litigationCaseNumber: lit ? lit.case_number : null,
+        litigationCaseType: lit ? lit.case_type : null,
+        litigationCourt: lit ? lit.court : null,
+        litigationStatus: lit ? lit.status : null,
         isMultiProjectOverlap,
-        overlappingProjectId: ovl?.overlapping_project_id,
-        overlapNote: ovl?.note,
+        overlappingProjectId: ovl ? ovl.overlapping_project_id : null,
+        overlapNote: ovl ? ovl.note : null,
       },
       create: {
         id: pcl.parcel_id,
@@ -251,13 +248,13 @@ async function main() {
         projectId: pcl.project_id,
         projectName: pcl.project_name,
         isLitigation,
-        litigationCaseNumber: lit?.case_number,
-        litigationCaseType: lit?.case_type,
-        litigationCourt: lit?.court,
-        litigationStatus: lit?.status,
+        litigationCaseNumber: lit ? lit.case_number : null,
+        litigationCaseType: lit ? lit.case_type : null,
+        litigationCourt: lit ? lit.court : null,
+        litigationStatus: lit ? lit.status : null,
         isMultiProjectOverlap,
-        overlappingProjectId: ovl?.overlapping_project_id,
-        overlapNote: ovl?.note,
+        overlappingProjectId: ovl ? ovl.overlapping_project_id : null,
+        overlapNote: ovl ? ovl.note : null,
       },
     });
   }
@@ -409,9 +406,9 @@ async function main() {
     });
   }
 
-  // 13. Users (Seed auth table with bcrypt hashed Demo@123 password and role mapping)
+  // 13. Users
   console.log("Upserting users...");
-  const roleCodeMap: Record<string, string> = {
+  const roleCodeMap = {
     "Central Ministry": "CENTRAL_MINISTRY",
     "State Government": "STATE_OFFICER",
     "District Collector / CALA": "DISTRICT_COLLECTOR",
@@ -446,7 +443,7 @@ async function main() {
     });
   }
 
-  // Also ensure default legacy demo users exist for seamless role switching if needed
+  // Also maintain backward-compatible demo accounts
   const defaultAccounts = [
     { email: "central.ministry@lams.gov.in", name: "Dr. Arvind Subramanian", role: "CENTRAL_MINISTRY" },
     { email: "state.maharashtra@lams.gov.in", name: "Smt. Manisha Verma, IAS", role: "STATE_OFFICER" },

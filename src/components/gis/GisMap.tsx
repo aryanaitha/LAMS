@@ -10,12 +10,20 @@ export const STATUS_COLORS: Record<
   { fill: string; stroke: string; label: string; labelHi: string }
 > = {
   PROPOSED: { fill: "#94a3b8", stroke: "#475569", label: "Proposed", labelHi: "प्रस्तावित" },
+  proposed: { fill: "#94a3b8", stroke: "#475569", label: "Proposed", labelHi: "प्रस्तावित" },
   NOTIFIED: { fill: "#38bdf8", stroke: "#0284c7", label: "Notified (Sec 11)", labelHi: "अधिसूचित (धारा 11)" },
+  notified: { fill: "#38bdf8", stroke: "#0284c7", label: "Notified (Sec 11)", labelHi: "अधिसूचित (धारा 11)" },
   OBJECTIONS: { fill: "#f59e0b", stroke: "#d97706", label: "Objections (Sec 15)", labelHi: "आपत्तियां (धारा 15)" },
+  objections: { fill: "#f59e0b", stroke: "#d97706", label: "Objections (Sec 15)", labelHi: "आपत्तियां (धारा 15)" },
   AWARDED: { fill: "#a855f7", stroke: "#7e22ce", label: "Award Declared", labelHi: "पंचाट घोषित" },
+  awarded: { fill: "#a855f7", stroke: "#7e22ce", label: "Award Declared", labelHi: "पंचाट घोषित" },
   COMPENSATION_PAID: { fill: "#10b981", stroke: "#047857", label: "Compensation Paid", labelHi: "मुआवजा भुगतान संपन्न" },
+  compensation_paid: { fill: "#10b981", stroke: "#047857", label: "Compensation Paid", labelHi: "मुआवजा भुगतान संपन्न" },
   POSSESSED: { fill: "#059669", stroke: "#064e3b", label: "Possessed / Handover", labelHi: "दखल प्राप्त" },
+  possessed: { fill: "#059669", stroke: "#064e3b", label: "Possessed / Handover", labelHi: "दखल प्राप्त" },
   DISPUTED: { fill: "#ef4444", stroke: "#b91c1c", label: "Litigation Dispute", labelHi: "न्यायालयीन विवादित" },
+  disputed: { fill: "#ef4444", stroke: "#b91c1c", label: "Litigation Dispute", labelHi: "न्यायालयीन विवादित" },
+  disputed_litigation: { fill: "#ef4444", stroke: "#b91c1c", label: "Litigation Dispute", labelHi: "न्यायालयीन विवादित" },
 };
 
 // Client-safe Leaflet dynamic component
@@ -123,11 +131,20 @@ const LeafletMapContainer = dynamic(
 
             {/* Cadastral Parcels Layer */}
             {parcels.map((p: any) => {
-              const statusCfg = STATUS_COLORS[p.status] || STATUS_COLORS.PROPOSED;
+              const statusCfg = STATUS_COLORS[p.status] || STATUS_COLORS[p.status?.toLowerCase()] || STATUS_COLORS.proposed;
               const isSelected = selectedParcel?.ulpin === p.ulpin;
-
-              // GeoJSON coordinates are [lng, lat], Leaflet Polygon expects [lat, lng]
-              const coords = p.coordinates.map((pt: [number, number]) => [pt[1], pt[0]]);
+              const coords = (p.coordinates || []).map((pt: [number, number]) => [pt[1], pt[0]]);
+              const isLit = Boolean(p.isLitigation || p.is_litigation);
+              const isOverlap = Boolean(p.isMultiProjectOverlap || p.is_multi_project_overlap);
+              const strokeColor = isSelected
+                ? "#090d16"
+                : isLit
+                ? "#dc2626"
+                : isOverlap
+                ? "#ea580c"
+                : statusCfg.stroke;
+              const weight = isSelected ? 3.5 : isLit || isOverlap ? 2.5 : 1.8;
+              const dashArray = isLit ? "5, 4" : isOverlap ? "6, 3" : undefined;
 
               return (
                 <Polygon
@@ -137,20 +154,31 @@ const LeafletMapContainer = dynamic(
                     click: () => onSelectParcel(p),
                   }}
                   pathOptions={{
-                    fillColor: isSelected ? "#facc15" : statusCfg.fill,
-                    fillOpacity: isSelected ? 0.85 : 0.45,
-                    color: isSelected ? "#090d16" : statusCfg.stroke,
-                    weight: isSelected ? 3.5 : 1.8,
+                    fillColor: isSelected ? "#facc15" : isLit ? "#fecaca" : statusCfg.fill,
+                    fillOpacity: isSelected ? 0.85 : isLit ? 0.65 : 0.45,
+                    color: strokeColor,
+                    weight,
+                    dashArray,
                   }}
                 >
                   <Tooltip sticky>
                     <div className="text-xs space-y-0.5 p-0.5">
-                      <p className="font-bold text-slate-900">Survey No. {p.surveyNo}</p>
+                      <p className="font-bold text-slate-900">Survey No. {p.surveyNo || p.survey_number}</p>
                       <p className="text-[10px] text-slate-500 font-mono">ULPIN: {p.ulpin}</p>
-                      <p className="text-[10px] text-slate-700">{p.ownerName}</p>
+                      <p className="text-[10px] text-slate-700">{p.ownerName || p.village_name}</p>
                       <p className="font-semibold text-[10px] text-emerald-700">
-                        {p.areaHa} Ha • {statusCfg.label}
+                        {p.areaHa || p.area_ha} Ha • {statusCfg.label}
                       </p>
+                      {isLit && (
+                        <p className="font-bold text-[10px] text-red-600">
+                          ⚖️ Active Court Litigation Case
+                        </p>
+                      )}
+                      {isOverlap && (
+                        <p className="font-bold text-[10px] text-amber-600">
+                          ⚠️ Multi-Project Corridor Overlap
+                        </p>
+                      )}
                     </div>
                   </Tooltip>
                 </Polygon>

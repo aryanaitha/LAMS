@@ -17,54 +17,59 @@ model User {
   department   String?
   phone        String?
   jurisdiction String?
+  linkedId     String?  // Links to Owner (OWN-xxxx), Project (PRJ-xxxx), District, or State
   createdAt    DateTime @default(now())
   updatedAt    DateTime @updatedAt
 }
 
 model Project {
-  id               String   @id @default(cuid())
-  code             String   @unique
+  id               String   @id // PRJ-001, etc.
+  code             String   @unique // PRJ-001, etc.
   name             String
   nameHi           String?
-  sector           String   // HIGHWAY, RAILWAY, IRRIGATION, INDUSTRIAL, TRANSMISSION
-  state            String
+  sector           String   // Highway, Rail, Canal/Irrigation, Industrial Corridor, Transmission Line
+  state            String   @default("Madhya Pradesh")
   district         String
   tehsils          String
-  status           String   // PROPOSAL, SCRUTINY, SIA, SEC_11, OBJECTIONS, SEC_19, AWARD, COMPENSATION, POSSESSION, COMPLETED
+  status           String   // proposal, scrutiny, sia_appraisal, preliminary_notification, objections, final_declaration, award, compensation
   stage            String
   slaDeadline      DateTime
+  isDelayed        Boolean  @default(false)
   delayRiskScore   Int      @default(10)
   delayReasons     String?  // JSON string array
-  budgetCr         Float
+  budgetCr         Float    @default(0)
   disbursedCr      Float    @default(0)
-  targetAreaHa     Float
+  targetAreaHa     Float    @default(0)
   acquiredAreaHa   Float    @default(0)
   totalParcels     Int      @default(0)
   affectedFamilies Int      @default(0)
-  requiringBody    String
+  requiringBody    String   @default("National Highways Authority of India (NHAI)")
+  startDate        DateTime?
   createdAt        DateTime @default(now())
   updatedAt        DateTime @updatedAt
 }
 
 model Village {
-  id          String   @id @default(cuid())
+  id          String   @id // VLG-001, etc.
   name        String
-  nameHi      String
+  nameHi      String?
   tehsil      String
   district    String
-  state       String
+  state       String   @default("Madhya Pradesh")
   lat         Float
   lng         Float
   parcelCount Int      @default(0)
 }
 
 model Owner {
-  id                 String   @id @default(cuid())
+  id                 String   @id // OWN-0001, etc.
   name               String
   nameHi             String?
+  gender             String?
   maskedPhone        String
-  maskedAadhaar      String
-  address            String
+  maskedAadhaar      String?
+  address            String?
+  villageId          String?
   bankAccountMasked  String?
   ifsc               String?
   isVulnerable       Boolean  @default(false)
@@ -76,63 +81,135 @@ model Owner {
 }
 
 model Parcel {
-  id                    String   @id @default(cuid())
+  id                    String   @id // PCL-0001, etc.
   ulpin                 String   @unique
   surveyNo              String
   subDivision           String?
   villageId             String
   villageName           String
   district              String
+  tehsil                String
   areaHa                Float
-  landUse               String   // AGRICULTURAL_IRRIGATED, AGRICULTURAL_UNIRRIGATED, COMMERCIAL, RESIDENTIAL, BARREN
-  status                String   // PROPOSED, NOTIFIED, OBJECTIONS, AWARDED, COMPENSATION_PAID, POSSESSED, DISPUTED
+  landUse               String   // Agricultural, Residential, Barren, Mixed Use
+  status                String   // proposed, notified, objections, awarded, compensation_paid, possessed, disputed_litigation
   geometry              String   // GeoJSON polygon coordinates string
   centerLat             Float
   centerLng             Float
   ownerId               String?
   ownerName             String?
   projectId             String?
-  marketValuePerHa      Float
-  calculatedCompensation Float
+  projectName           String?
+  marketValuePerHa      Float    @default(3500000)
+  calculatedCompensation Float   @default(0)
   paidCompensation      Float    @default(0)
   isLitigation          Boolean  @default(false)
+  litigationCaseNumber  String?
+  litigationCaseType    String?
+  litigationCourt       String?
+  litigationStatus      String?
   isEcoSensitive        Boolean  @default(false)
   isMultiProjectOverlap Boolean  @default(false)
+  overlappingProjectId  String?
+  overlapNote           String?
   overlappingProjects   String?
   createdAt             DateTime @default(now())
 }
 
+model LitigationCase {
+  id          String   @id // Case number or CUID
+  caseNumber  String   @unique
+  parcelId    String
+  caseType    String
+  court       String
+  filedDate   DateTime?
+  status      String   // stayed, hearing_scheduled, pending
+  createdAt   DateTime @default(now())
+}
+
+model ParcelProjectOverlap {
+  id                   String @id // OVL-001, etc.
+  parcelId             String
+  primaryProjectId     String
+  overlappingProjectId String
+  note                 String?
+}
+
+model ProjectStageHistory {
+  id        String    @id // STG-001, etc.
+  projectId String
+  stage     String
+  startDate DateTime
+  endDate   DateTime?
+  status    String    // completed, in_progress
+  slaDays   Int       @default(30)
+}
+
 model CandidateAlignment {
-  id                     String   @id @default(cuid())
+  id                     String   @id // ALN-1, etc.
+  alignmentId            String   @unique
   projectId              String
   name                   String
-  description            String
-  bufferWidthMeters      Float
+  description            String?
+  label                  String?
+  bufferWidthMeters      Float    @default(100)
   lineGeometry           String   // GeoJSON LineString
-  affectedParcelsCount   Int
-  affectedAreaHa         Float
-  estimatedCostCr        Float
-  displacedFamiliesCount Int
-  forestWaterOverlapHa   Float
+  affectedParcelsCount   Int      @default(0)
+  affectedAreaHa         Float    @default(0)
+  estimatedCostCr        Float    @default(0)
+  displacedFamiliesCount Int      @default(0)
+  forestWaterOverlapHa   Float    @default(0)
   isRecommended          Boolean  @default(false)
-  recommendationScore    Float
-  recommendationReasons  String
+  recommendationScore    Float    @default(80)
+  recommendationReasons  String   @default("")
+}
+
+model RrFamily {
+  id                      String   @id // RRF-0001, etc.
+  familyId                String   @unique
+  parcelId                String
+  ownerId                 String
+  projectId               String
+  membersCount            Int      @default(4)
+  vulnerableScSt          Boolean  @default(false)
+  vulnerableWomenHeaded   Boolean  @default(false)
+  entitlementHouse        Boolean  @default(false)
+  entitlementEmployment   Boolean  @default(false)
+  subsistenceAllowanceInr Int      @default(0)
+  rrStatus                String   @default("pending") // pending, in_progress, completed
+  geotaggedEvidence       String?  // JSON string storing geotagged inspection evidence
+  createdAt               DateTime @default(now())
 }
 
 model Grievance {
-  id               String    @id @default(cuid())
+  id               String    @id // GRV-001 or cuid
   trackingNo       String    @unique
+  parcelId         String?
   parcelUlpin      String?
   surveyNo         String?
+  ownerId          String?
+  projectId        String?
   applicantName    String
   applicantPhone   String
-  category         String    // COMPENSATION_AMOUNT, OWNERSHIP_DISPUTE, MEASUREMENT_ERROR, RR_BENEFIT, OTHER
+  category         String    // Compensation amount dispute, Boundary/survey discrepancy, etc.
   description      String
-  status           String    @default("PENDING") // PENDING, UNDER_REVIEW, HEARING_SCHEDULED, RESOLVED, REJECTED
+  status           String    @default("open") // open, under_review, resolved
   hearingDate      DateTime?
   resolutionNotes  String?
   filedAt          DateTime  @default(now())
   resolvedAt       DateTime?
+}
+
+model Document {
+  id             String   @id // DOC-0001, etc.
+  documentId     String   @unique
+  parcelId       String?
+  projectId      String?
+  docType        String   // Possession_Certificate, Objection_Reply, etc.
+  filename       String
+  version        Int      @default(1)
+  sha256Hash     String
+  uploadedByRole String
+  uploadedDate   DateTime @default(now())
 }
 
 model AuditLog {
@@ -145,8 +222,8 @@ model AuditLog {
   entityId    String
   details     String
   ipAddress   String?
-  prevHash    String
-  hash        String
+  prevHash    String   @default("")
+  hash        String   @default("")
 }
 
 model AppNotification {

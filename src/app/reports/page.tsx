@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useState } from "react";
+import { useSession } from "next-auth/react";
 import { useLanguage } from "@/i18n/LanguageContext";
 import {
   FileText,
@@ -17,6 +18,8 @@ import {
 
 export default function ReportsMisPage() {
   const { t, locale } = useLanguage();
+  const { data: session } = useSession();
+  const userRole = (session?.user as any)?.role as string | undefined;
 
   const [selectedSector, setSelectedSector] = useState<string>("ALL");
   const [selectedStatus, setSelectedStatus] = useState<string>("ALL");
@@ -97,7 +100,14 @@ export default function ReportsMisPage() {
     },
   ];
 
-  const filteredRows = reportRows.filter((r) => {
+  // Role scoping according to RBAC Matrix Row 20
+  const scopedRows = reportRows.filter((row) => {
+    if (userRole === "REQUIRING_BODY") return ["NH-2026-084", "NH-2026-102"].includes(row.code);
+    if (userRole === "DISTRICT_COLLECTOR") return row.district === "Nashik";
+    return true;
+  });
+
+  const filteredRows = scopedRows.filter((r) => {
     const matchSec = selectedSector === "ALL" || r.sector === selectedSector;
     const matchStat = selectedStatus === "ALL" || r.status === selectedStatus;
     return matchSec && matchStat;

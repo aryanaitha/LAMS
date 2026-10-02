@@ -7,21 +7,54 @@ import { useSession, signOut } from "next-auth/react";
 import { useLanguage } from "@/i18n/LanguageContext";
 import { LanguageSelector } from "@/components/ui/LanguageSelector";
 import { DemoRoleSwitcher } from "@/components/ui/DemoRoleSwitcher";
+import { NotificationBell } from "@/components/layout/NotificationBell";
 import {
+  getNavItemsForRole,
+  getRoleIndicator,
+  UserRole,
+} from "@/lib/permissions";
+import {
+  Building2,
+  Building,
   Map,
-  FileText,
-  Calculator,
-  Users,
-  ShieldAlert,
   BarChart3,
-  Settings,
-  LogIn,
+  ClipboardList,
+  FileText,
+  FolderOpen,
+  FilePlus,
+  Camera,
+  HelpCircle,
+  Coins,
+  Users,
+  ShieldCheck,
+  Sliders,
+  Database,
+  ShieldAlert,
   LogOut,
   User,
   Menu,
   X,
-  Building2,
 } from "lucide-react";
+
+// Icon mapping table for dynamic role navigation
+const ICON_MAP: Record<string, React.ComponentType<{ className?: string }>> = {
+  Building2,
+  Building,
+  Map,
+  BarChart3,
+  ClipboardList,
+  FileText,
+  FolderOpen,
+  FilePlus,
+  Camera,
+  HelpCircle,
+  Coins,
+  Users,
+  ShieldCheck,
+  Sliders,
+  Database,
+  ShieldAlert,
+};
 
 export function Navbar() {
   const { t, locale } = useLanguage();
@@ -29,25 +62,9 @@ export function Navbar() {
   const { data: session } = useSession();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
 
-  const isPublicLanding = pathname === "/" && !session;
-  const userRole = (session?.user as any)?.role;
-
-  // Filter links by role in authenticated mode
-  const navLinks = [
-    { href: "/gis", label: t.nav.gisExplorer, icon: Map, roles: ["CENTRAL_MINISTRY", "STATE_OFFICER", "DISTRICT_COLLECTOR", "REQUIRING_BODY", "FIELD_OFFICER", "ADMIN"] },
-    { href: "/dashboard/collector", label: "Collector Console", icon: FileText, roles: ["DISTRICT_COLLECTOR", "ADMIN"] },
-    { href: "/dashboard/citizen", label: t.nav.landownerPortal, icon: User, roles: ["LANDOWNER", "ADMIN"] },
-    { href: "/dashboard/central", label: "National Dashboard", icon: Building2, roles: ["CENTRAL_MINISTRY", "STATE_OFFICER", "ADMIN"] },
-    { href: "/calculator", label: "Compensation Record", icon: Calculator, roles: ["CENTRAL_MINISTRY", "STATE_OFFICER", "DISTRICT_COLLECTOR", "REQUIRING_BODY", "LANDOWNER", "ADMIN"] },
-    { href: "/rr", label: t.nav.rrTracker, icon: Users, roles: ["DISTRICT_COLLECTOR", "ADMIN"] },
-    { href: "/audit", label: t.nav.auditTrail, icon: ShieldAlert, roles: ["CENTRAL_MINISTRY", "STATE_OFFICER", "DISTRICT_COLLECTOR", "ADMIN"] },
-    { href: "/reports", label: t.nav.reports, icon: BarChart3, roles: ["CENTRAL_MINISTRY", "STATE_OFFICER", "DISTRICT_COLLECTOR", "REQUIRING_BODY", "ADMIN"] },
-    { href: "/admin", label: t.nav.admin, icon: Settings, roles: ["ADMIN"] },
-  ];
-
-  const visibleLinks = navLinks.filter(
-    (item) => !item.roles || (userRole && item.roles.includes(userRole))
-  );
+  const userRole = (session?.user as any)?.role as UserRole | undefined;
+  const roleIndicator = getRoleIndicator(userRole, locale);
+  const navItems = getNavItemsForRole(userRole);
 
   return (
     <header className="sticky top-0 z-40 bg-white border-b border-slate-200 shadow-xs">
@@ -84,8 +101,9 @@ export function Navbar() {
           </div>
         </div>
 
-        {/* Minimal Unauthenticated Landing Top Bar: Wordmark, "About", "Login", "Register" */}
+        {/* Right side controls */}
         {!session ? (
+          /* Minimal Unauthenticated Landing Top Bar: Wordmark, "About", "Login", "Register" */
           <div className="flex items-center gap-3 md:gap-5">
             <Link
               href="/#about"
@@ -112,56 +130,121 @@ export function Navbar() {
             </div>
           </div>
         ) : (
-          /* Authenticated App Controls */
-          <div className="flex items-center gap-3">
+          /* Authenticated Top Ribbon Controls */
+          <div className="flex items-center gap-2.5 sm:gap-3.5">
+            {/* Current Role Indicator */}
+            {roleIndicator && (
+              <div className="hidden lg:flex items-center gap-1.5 bg-amber-500/10 border border-amber-400/30 px-2.5 py-1 rounded-md text-xs font-medium text-amber-300">
+                <span className="text-[11px] text-slate-300 font-normal">
+                  {locale === "hi" ? "लॉग इन:" : "Logged in as:"}
+                </span>
+                <span className="font-bold text-amber-200">{roleIndicator}</span>
+              </div>
+            )}
+
+            {/* Notification Bell with Dropdown */}
+            <NotificationBell />
+
+            {/* Language Selector */}
             <LanguageSelector />
+
+            {/* Instant Demo Role Switcher */}
             <DemoRoleSwitcher />
 
+            {/* User Profile Capsule */}
             <div className="hidden sm:flex items-center gap-2 bg-slate-800/80 px-2.5 py-1 rounded-md border border-slate-700 text-xs">
               <User className="w-3.5 h-3.5 text-amber-400" />
-              <span className="font-semibold text-slate-200">{session.user?.name}</span>
-              <span className="text-[9px] uppercase font-mono px-1.5 py-0.2 bg-amber-500/20 text-amber-300 rounded">
-                {userRole}
+              <span className="font-semibold text-slate-200 truncate max-w-[120px]">
+                {session.user?.name}
               </span>
             </div>
 
+            {/* Sign Out Button */}
             <button
               onClick={() => signOut({ callbackUrl: "/" })}
               className="flex items-center gap-1 text-xs font-semibold px-2.5 py-1.5 rounded bg-rose-950/70 hover:bg-rose-900 text-rose-200 transition border border-rose-800"
-              title="Sign Out"
+              title={locale === "hi" ? "लॉग आउट" : "Sign Out"}
             >
               <LogOut className="w-3.5 h-3.5" />
-              <span className="hidden sm:inline">{locale === "hi" ? "लॉग आउट" : "Sign Out"}</span>
+              <span className="hidden sm:inline">
+                {locale === "hi" ? "लॉग आउट" : "Sign Out"}
+              </span>
+            </button>
+
+            {/* Mobile Hamburger Button */}
+            <button
+              onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
+              className="md:hidden p-1.5 rounded bg-slate-800 text-slate-200 border border-slate-700"
+            >
+              {mobileMenuOpen ? <X className="w-4 h-4" /> : <Menu className="w-4 h-4" />}
             </button>
           </div>
         )}
       </div>
 
-      {/* 3. Primary Navigation Bar — ONLY SHOWN WHEN AUTHENTICATED */}
-      {session && (
+      {/* 3. Primary Role-Driven Navigation Ribbon — ONLY SHOWN WHEN AUTHENTICATED */}
+      {session && navItems.length > 0 && (
         <nav className="bg-slate-50 border-b border-slate-200 px-4 md:px-8 py-1.5 hidden md:block overflow-x-auto">
           <ul className="flex items-center gap-1.5 text-xs font-medium text-slate-700 min-w-max">
-            {visibleLinks.map((link) => {
-              const isActive = pathname === link.href;
-              const Icon = link.icon;
+            {navItems.map((item) => {
+              const isActive =
+                pathname === item.href ||
+                (item.href.includes("?") &&
+                  pathname === item.href.split("?")[0]);
+              const Icon = ICON_MAP[item.iconName] || FileText;
+
               return (
-                <li key={link.href}>
+                <li key={item.href}>
                   <Link
-                    href={link.href}
+                    href={item.href}
                     className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md transition ${
                       isActive
-                        ? "bg-[#0a2240] text-white font-semibold shadow-xs"
-                        : "hover:bg-slate-200 text-slate-700"
+                        ? "bg-gov-navy text-white font-bold shadow-xs"
+                        : "text-slate-700 hover:bg-slate-200/70 hover:text-slate-900"
                     }`}
                   >
                     <Icon className={`w-3.5 h-3.5 ${isActive ? "text-amber-400" : "text-slate-500"}`} />
-                    <span>{link.label}</span>
+                    <span>{locale === "hi" ? item.labelHi : item.label}</span>
                   </Link>
                 </li>
               );
             })}
           </ul>
         </nav>
+      )}
+
+      {/* Mobile Drawer Navigation */}
+      {session && mobileMenuOpen && (
+        <div className="md:hidden bg-slate-100 border-b border-slate-300 p-4 space-y-2">
+          {roleIndicator && (
+            <div className="p-2 bg-amber-500/10 border border-amber-400/30 rounded text-xs text-amber-800 font-semibold mb-2">
+              {locale === "hi" ? "लॉग इन: " : "Logged in as: "} {roleIndicator}
+            </div>
+          )}
+          <ul className="space-y-1">
+            {navItems.map((item) => {
+              const isActive = pathname === item.href;
+              const Icon = ICON_MAP[item.iconName] || FileText;
+
+              return (
+                <li key={item.href}>
+                  <Link
+                    href={item.href}
+                    onClick={() => setMobileMenuOpen(false)}
+                    className={`flex items-center gap-2 px-3 py-2 rounded text-xs font-medium ${
+                      isActive
+                        ? "bg-gov-navy text-white font-bold"
+                        : "text-slate-800 hover:bg-slate-200"
+                    }`}
+                  >
+                    <Icon className="w-4 h-4" />
+                    <span>{locale === "hi" ? item.labelHi : item.label}</span>
+                  </Link>
+                </li>
+              );
+            })}
+          </ul>
+        </div>
       )}
     </header>
   );

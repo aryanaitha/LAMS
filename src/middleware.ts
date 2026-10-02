@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import type { NextRequest } from "next/server";
 import { getToken } from "next-auth/jwt";
+import { canAccessRoute, getDefaultDashboardPath } from "@/lib/permissions";
 
 export async function middleware(req: NextRequest) {
   const { pathname } = req.nextUrl;
@@ -19,7 +20,7 @@ export async function middleware(req: NextRequest) {
     return NextResponse.next();
   }
 
-  // 2. Extract JWT token for all protected routes (e.g. /gis, /dashboard, /calculator, /admin, /reports, etc.)
+  // 2. Extract JWT token for all protected routes
   const token = await getToken({
     req,
     secret: process.env.NEXTAUTH_SECRET || "lams-super-secure-production-ready-jwt-secret-2026",
@@ -41,39 +42,20 @@ export async function middleware(req: NextRequest) {
 
   const role = (token as any).role as string;
 
-  // 3. Strict Role-specific route boundaries based on PS scope
-  const roleRestrictions: Record<string, string[]> = {
-    "/dashboard/central": ["CENTRAL_MINISTRY"],
-    "/dashboard/state": ["STATE_OFFICER", "CENTRAL_MINISTRY"],
-    "/dashboard/collector": ["DISTRICT_COLLECTOR"],
-    "/dashboard/requiring-body": ["REQUIRING_BODY"],
-    "/dashboard/field": ["FIELD_OFFICER"],
-    "/dashboard/citizen": ["LANDOWNER"],
-    "/admin": ["ADMIN"],
-    "/api/admin": ["ADMIN"],
-    "/reports": ["CENTRAL_MINISTRY", "STATE_OFFICER", "DISTRICT_COLLECTOR", "REQUIRING_BODY", "ADMIN"],
-    "/api/proposals": ["REQUIRING_BODY"],
-    "/api/awards": ["DISTRICT_COLLECTOR"],
-    "/api/field-surveys": ["FIELD_OFFICER"],
-    "/api/grievances": ["LANDOWNER", "DISTRICT_COLLECTOR"],
-  };
+  // 3. Strict Role-specific route boundaries driven by single source of truth (permissions.ts)
+  const allowed = canAccessRoute(role, pathname);
 
-  for (const [routePrefix, allowedRoles] of Object.entries(roleRestrictions)) {
-    if (pathname.startsWith(routePrefix)) {
-      if (!allowedRoles.includes(role)) {
-        if (isApi) {
-          return NextResponse.json(
-            {
-              error: `Forbidden: Role '${role}' is not authorized to access this resource.`,
-              code: "FORBIDDEN_ROLE_ACCESS",
-              requiredRoles: allowedRoles,
-            },
-            { status: 403 }
-          );
-        }
-        return NextResponse.redirect(new URL("/unauthorized", req.url));
-      }
+  if (!allowed) {
+    if (isApi) {
+      return NextResponse.json(
+        {
+          error: `Forbidden: Role '${role}' is not authorized to access '${pathname}'.`,
+          code: "FORBIDDEN_ROLE_ACCESS",
+        },
+        { status: 403 }
+      );
     }
+    return NextResponse.redirect(new URL("/unauthorized", req.url));
   }
 
   return NextResponse.next();

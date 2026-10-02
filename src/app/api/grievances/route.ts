@@ -26,6 +26,7 @@ export async function POST(req: Request) {
 
     const grievance = await prisma.grievance.create({
       data: {
+        id: trackingNo,
         trackingNo,
         parcelUlpin: parcelUlpin || "MH24-0891-4402",
         surveyNo: surveyNo || "104/2",

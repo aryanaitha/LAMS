@@ -34,6 +34,7 @@ export async function POST(req: Request) {
 
     const newProject = await prisma.project.create({
       data: {
+        id: code,
         code,
         name,
         sector: sector || "HIGHWAY",

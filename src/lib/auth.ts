@@ -44,6 +44,7 @@ export const authOptions: NextAuthOptions = {
           role: user.role,
           department: user.department || "",
           jurisdiction: user.jurisdiction || "",
+          linkedId: user.linkedId || null,
         };
       },
     }),
@@ -55,6 +56,7 @@ export const authOptions: NextAuthOptions = {
         token.role = (user as any).role;
         token.department = (user as any).department;
         token.jurisdiction = (user as any).jurisdiction;
+        token.linkedId = (user as any).linkedId;
       }
       return token;
     },
@@ -64,6 +66,7 @@ export const authOptions: NextAuthOptions = {
         (session.user as any).role = token.role;
         (session.user as any).department = token.department;
         (session.user as any).jurisdiction = token.jurisdiction;
+        (session.user as any).linkedId = token.linkedId;
       }
       return session;
     },

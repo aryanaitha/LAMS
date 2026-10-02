@@ -90,6 +90,17 @@ export default function CollectorConsolePage() {
       summary:
         "18 farmer objections heard regarding fruit tree and micro-irrigation pipe valuation. Supplementary valuation report submitted by District Horticulture Officer for 6 parcels.",
     },
+    {
+      id: "CASE-2026-095",
+      project: "NH-2026-084 (Sinnar Bypass)",
+      type: "Section 38 Physical Possession Handover Warrant",
+      village: "Musalgaon (Farmland Parcels 104-106)",
+      requiringBody: "NHAI Western PIU",
+      slaDaysLeft: 7,
+      urgency: "HIGH",
+      summary:
+        "Full compensation deposited in escrow. Joint field survey and panchanama completed. Warrant for handing over physical unencumbered possession to NHAI submitted for CALA signature.",
+    },
   ];
 
   const current = pendingDockets.find((d) => d.id === activeItem) || pendingDockets[0];

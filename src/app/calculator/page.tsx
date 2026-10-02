@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useState } from "react";
+import { useSession } from "next-auth/react";
 import { useLanguage } from "@/i18n/LanguageContext";
 import {
   Coins,
@@ -14,12 +15,16 @@ import {
   Scale,
   ArrowRight,
   ShieldCheck,
+  Send,
+  Loader2,
 } from "lucide-react";
 
 export default function CompensationRecordPage() {
   const { t, locale } = useLanguage();
+  const { data: session } = useSession();
+  const userRole = (session?.user as any)?.role as string | undefined;
 
-  const parcels = [
+  const [parcelsState, setParcelsState] = useState([
     {
       ulpin: "MH24-0891-4402",
       surveyNo: "104/2",
@@ -71,10 +76,20 @@ export default function CompensationRecordPage() {
       pfmsStatus: "CREDITED_VIA_DBT",
       utr: "PFMS2026082219481",
     },
-  ];
+  ]);
 
-  const [selectedUlpin, setSelectedUlpin] = useState(parcels[0].ulpin);
-  const p = parcels.find((x) => x.ulpin === selectedUlpin) || parcels[0];
+  // Scoping according to RBAC Matrix Row 10:
+  // Landowner sees only their own parcel
+  const visibleParcels = parcelsState.filter((item) => {
+    if (userRole === "LANDOWNER") return item.ulpin === "MH24-0891-4402";
+    return true;
+  });
+
+  const [selectedUlpin, setSelectedUlpin] = useState("MH24-0891-4402");
+  const p = visibleParcels.find((x) => x.ulpin === selectedUlpin) || visibleParcels[0] || parcelsState[0];
+
+  const [isAuthorizing, setIsAuthorizing] = useState(false);
+  const [authSuccess, setAuthSuccess] = useState<string | null>(null);
 
   // RFCTLARR Schedule I Formula
   const baseLandValue = p.areaHa * p.circleRatePerHa;
@@ -83,6 +98,43 @@ export default function CompensationRecordPage() {
   const solatiumAmount = (marketPlusAssets * p.solatiumPct) / 100;
   const additionalInterest = (baseLandValue * 0.12 * p.interestMonths) / 12;
   const totalAssessed = marketPlusAssets + solatiumAmount + additionalInterest;
+
+  const handleAuthorizePayment = async () => {
+    setIsAuthorizing(true);
+    try {
+      const res = await fetch("/api/compensation", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          ulpin: p.ulpin,
+          amount: totalAssessed,
+          ownerName: p.owner,
+        }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "Failed to authorize");
+
+      setParcelsState((prev) =>
+        prev.map((item) =>
+          item.ulpin === p.ulpin
+            ? {
+                ...item,
+                status: "COMPENSATION_PAID",
+                pfmsStatus: "CREDITED_VIA_DBT",
+                disbursedAmt: totalAssessed,
+                utr: data.utr,
+              }
+            : item
+        )
+      );
+      setAuthSuccess(data.message);
+      setTimeout(() => setAuthSuccess(null), 5000);
+    } catch (err: any) {
+      setAuthSuccess(`Error: ${err.message}`);
+    } finally {
+      setIsAuthorizing(false);
+    }
+  };
 
   const formatCurrency = (amt: number) => {
     return new Intl.NumberFormat("en-IN", {
@@ -116,7 +168,7 @@ export default function CompensationRecordPage() {
           <span className="text-xs font-semibold text-slate-700">Select Acquired Parcel:</span>
         </div>
         <div className="flex flex-wrap gap-2">
-          {parcels.map((item) => (
+          {visibleParcels.map((item) => (
             <button
               key={item.ulpin}
               onClick={() => setSelectedUlpin(item.ulpin)}
@@ -131,6 +183,13 @@ export default function CompensationRecordPage() {
           ))}
         </div>
       </div>
+
+      {authSuccess && (
+        <div className="p-4 rounded-xl bg-emerald-50 border border-emerald-300 text-emerald-900 text-xs font-medium flex items-center gap-2.5 shadow-2xs">
+          <CheckCircle2 className="w-5 h-5 text-emerald-600 shrink-0" />
+          <span>{authSuccess}</span>
+        </div>
+      )}
 
       {/* 2-Column Record View: Left = Parcel Dossier, Right = Assessment & Disbursement Breakdown */}
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
@@ -186,6 +245,32 @@ export default function CompensationRecordPage() {
             </div>
             <p className="text-[11px] text-slate-500 font-mono">UTR: {p.utr}</p>
           </div>
+
+          {/* DC-Only Action to Mark Paid / Authorize PFMS DBT (RBAC Row 11: A for DC, — for all others) */}
+          {userRole === "DISTRICT_COLLECTOR" && p.status !== "COMPENSATION_PAID" && (
+            <div className="mt-4 pt-4 border-t border-slate-200">
+              <button
+                onClick={handleAuthorizePayment}
+                disabled={isAuthorizing}
+                className="w-full py-2.5 px-4 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs font-bold transition flex items-center justify-center gap-2 shadow-xs disabled:opacity-50"
+              >
+                {isAuthorizing ? (
+                  <>
+                    <Loader2 className="w-4 h-4 animate-spin" />
+                    <span>Transmitting to PFMS...</span>
+                  </>
+                ) : (
+                  <>
+                    <Send className="w-4 h-4" />
+                    <span>Authorize PFMS DBT Payout</span>
+                  </>
+                )}
+              </button>
+              <p className="text-[10px] text-slate-400 text-center mt-1.5">
+                CALA Section 77 Statutory Payment Order
+              </p>
+            </div>
+          )}
         </div>
 
         {/* Right Column: Transparent Statutory Schedule I Breakdown */}

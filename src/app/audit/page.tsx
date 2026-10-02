@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useState } from "react";
+import { useSession } from "next-auth/react";
 import { useLanguage } from "@/i18n/LanguageContext";
 import {
   ShieldAlert,
@@ -31,6 +32,9 @@ interface AuditRecord {
 
 export default function AuditTrailPage() {
   const { t, locale } = useLanguage();
+  const { data: session } = useSession();
+  const userRole = (session?.user as any)?.role as string | undefined;
+
   const [isVerifying, setIsVerifying] = useState(false);
   const [verificationResult, setVerificationResult] = useState<{
     verified: boolean;
@@ -121,6 +125,9 @@ export default function AuditTrailPage() {
   };
 
   const filteredRecords = sampleAuditRecords.filter((r) => {
+    // RBAC Row 27: DC sees only district actions, Admin sees all
+    if (userRole === "DISTRICT_COLLECTOR" && r.actorRole === "ADMIN") return false;
+
     return (
       r.actorEmail.toLowerCase().includes(searchTerm.toLowerCase()) ||
       r.action.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -136,11 +143,18 @@ export default function AuditTrailPage() {
         <div>
           <div className="flex items-center gap-2 text-gov-navy">
             <ShieldCheck className="w-6 h-6 text-amber-500" />
-            <h1 className="text-2xl font-bold tracking-tight text-slate-900">
-              {locale === "hi"
-                ? "अपरिवर्तनीय ऑडिट ट्रेल एवं क्रिप्टोग्राफिक अखंडता"
-                : "Tamper-Evident Cryptographic Audit Trail"}
-            </h1>
+            <div className="flex items-center gap-2 flex-wrap">
+              <h1 className="text-2xl font-bold tracking-tight text-slate-900">
+                {locale === "hi"
+                  ? "अपरिवर्तनीय ऑडिट ट्रेल एवं क्रिप्टोग्राफिक अखंडता"
+                  : "Tamper-Evident Cryptographic Audit Trail"}
+              </h1>
+              {userRole === "DISTRICT_COLLECTOR" && (
+                <span className="font-mono text-[10px] uppercase font-bold px-2 py-0.5 rounded bg-amber-100 text-amber-900 border border-amber-300">
+                  Scoped: Nashik District Actions Only
+                </span>
+              )}
+            </div>
           </div>
           <p className="text-xs text-slate-500 mt-1">
             {locale === "hi"
