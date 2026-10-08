@@ -14,6 +14,7 @@ LAMS digitizes and unifies the end-to-end statutory land acquisition workflow un
 
 Designed to eliminate inter-departmental latency, curb project cost overruns, and guarantee transparent, equitable rehabilitation, LAMS links high-resolution satellite remote sensing with cadastral parcel registries, statutory timeline tracking, and direct benefit compensation disbursements.
 
+
 ---
 
 ## 🚀 Key Highlights & Capabilities (v2 Architecture)
